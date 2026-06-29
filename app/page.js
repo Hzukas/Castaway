@@ -1,65 +1,81 @@
-import Image from "next/image";
-
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main style={{
+      minHeight: '100vh',
+      background: '#0d1f2d',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: 'sans-serif',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <svg style={{position:'absolute',inset:0,width:'100%',height:'100%'}} xmlns="http://www.w3.org/2000/svg">
+        {[0,1,2,3,4,5,6,7,8].map(i=>(
+          <line key={i} x1="0" y1={`${i*12.5}%`} x2="100%" y2={`${i*12.5}%`} stroke="#378ADD" strokeWidth="0.5" strokeOpacity={i%2===0?0.12:0.06}/>
+        ))}
+        {[0,1,2,3,4,5,6,7,8,9,10].map(i=>(
+          <line key={i} x1={`${i*10}%`} y1="0" x2={`${i*10}%`} y2="100%" stroke="#378ADD" strokeWidth="0.5" strokeOpacity="0.06"/>
+        ))}
+        <path d="M 80,400 Q 400,-100 800,300" stroke="#FFD166" strokeWidth="1.5" strokeDasharray="6 6" fill="none" strokeOpacity="0.6"/>
+        <path d="M 100,600 Q 500,100 1200,400" stroke="#1D9E75" strokeWidth="1" strokeDasharray="5 7" fill="none" strokeOpacity="0.4"/>
+        <path d="M 300,800 Q 700,200 1400,500" stroke="#7F77DD" strokeWidth="1" strokeDasharray="4 8" fill="none" strokeOpacity="0.35"/>
+        <circle cx="80" cy="400" r="4" fill="#FFD166" fillOpacity="0.8"/>
+        <circle cx="800" cy="300" r="4" fill="#FFD166" fillOpacity="0.8"/>
+        <circle cx="100" cy="600" r="3" fill="#1D9E75" fillOpacity="0.7"/>
+        <circle cx="1200" cy="400" r="3" fill="#1D9E75" fillOpacity="0.7"/>
+      </svg>
+
+      <div style={{position:'relative',zIndex:1,textAlign:'center',padding:'2rem'}}>
+        <div style={{
+          fontSize:'13px',
+          fontWeight:600,
+          letterSpacing:'0.15em',
+          color:'#FFD166',
+          textTransform:'uppercase',
+          marginBottom:'16px',
+        }}>Find your island. Together.</div>
+
+        <h1 style={{
+          fontSize:'clamp(48px, 8vw, 96px)',
+          fontWeight:700,
+          color:'#ffffff',
+          margin:'0 0 8px',
+          letterSpacing:'-2px',
+          lineHeight:1,
+        }}>Castaway</h1>
+
+        <p style={{
+          fontSize:'18px',
+          color:'rgba(255,255,255,0.45)',
+          margin:'16px 0 40px',
+          maxWidth:'420px',
+        }}>Dream it. Pitch it. Go.</p>
+
+        <div style={{display:'flex',gap:'12px',justifyContent:'center',flexWrap:'wrap'}}>
+          <button style={{
+            background:'#FFD166',
+            color:'#1a0e00',
+            border:'none',
+            borderRadius:'10px',
+            padding:'14px 32px',
+            fontSize:'15px',
+            fontWeight:700,
+            cursor:'pointer',
+          }}>Start a group</button>
+          <button style={{
+            background:'transparent',
+            color:'rgba(255,255,255,0.7)',
+            border:'1px solid rgba(255,255,255,0.2)',
+            borderRadius:'10px',
+            padding:'14px 32px',
+            fontSize:'15px',
+            fontWeight:600,
+            cursor:'pointer',
+          }}>See how it works</button>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+      </div>
+    </main>
+  )
 }

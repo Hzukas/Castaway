@@ -19,7 +19,8 @@ export default function Dashboard() {
   }, [])
 
   async function loadGroups(userId) {
-    const { data } = await supabase.from('groups').select('*').eq('created_by', userId)
+    const { data, error } = await supabase.from('groups').select('*').eq('created_by', userId)
+    console.log('groups:', data, error)
     if (data) setGroups(data)
   }
 
@@ -32,6 +33,7 @@ export default function Dashboard() {
       invite_code,
       created_by: user.id,
     }).select()
+    console.log('created:', data, error)
     if (data) {
       setGroups([...groups, data[0]])
       setGroupName('')

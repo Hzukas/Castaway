@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 export default function Auth() {
@@ -9,13 +9,35 @@ export default function Auth() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const joinCode = localStorage.getItem('joinAfterAuth')
+        if (joinCode) {
+          localStorage.removeItem('joinAfterAuth')
+          window.location.href = `/join/${joinCode}`
+        } else {
+          window.location.href = '/dashboard'
+        }
+      }
+    })
+  }, [])
+
   async function handleSubmit() {
     setLoading(true)
     setMessage('')
     if (isLogin) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setMessage(error.message)
-      else window.location.href = '/dashboard'
+      else {
+        const joinCode = localStorage.getItem('joinAfterAuth')
+        if (joinCode) {
+          localStorage.removeItem('joinAfterAuth')
+          window.location.href = `/join/${joinCode}`
+        } else {
+          window.location.href = '/dashboard'
+        }
+      }
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) setMessage(error.message)
@@ -50,11 +72,9 @@ export default function Auth() {
         </div>
 
         <div style={{marginBottom:'16px'}}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
+          <input type="email" placeholder="Email" value={email}
             onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key==='Enter' && handleSubmit()}
             style={{
               width:'100%', padding:'12px 14px', borderRadius:'10px',
               border:'0.5px solid rgba(255,255,255,0.15)',
@@ -65,11 +85,9 @@ export default function Auth() {
         </div>
 
         <div style={{marginBottom:'24px'}}>
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
+          <input type="password" placeholder="Password" value={password}
             onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key==='Enter' && handleSubmit()}
             style={{
               width:'100%', padding:'12px 14px', borderRadius:'10px',
               border:'0.5px solid rgba(255,255,255,0.15)',
@@ -87,19 +105,14 @@ export default function Auth() {
           }}>{message}</div>
         )}
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          style={{
-            width:'100%', padding:'13px', borderRadius:'10px',
-            background:'#FFD166', color:'#1a0e00', border:'none',
-            fontSize:'15px', fontWeight:700, cursor:'pointer',
-          }}
-        >{loading ? 'Loading...' : isLogin ? 'Sign in' : 'Create account'}</button>
+        <button onClick={handleSubmit} disabled={loading} style={{
+          width:'100%', padding:'13px', borderRadius:'10px',
+          background:'#FFD166', color:'#1a0e00', border:'none',
+          fontSize:'15px', fontWeight:700, cursor:'pointer',
+        }}>{loading ? 'Loading...' : isLogin ? 'Sign in' : 'Create account'}</button>
 
         <div style={{textAlign:'center', marginTop:'20px'}}>
-          <button
-            onClick={() => setIsLogin(!isLogin)}
+          <button onClick={() => setIsLogin(!isLogin)}
             style={{background:'none', border:'none', color:'rgba(255,255,255,0.4)', fontSize:'13px', cursor:'pointer'}}
           >{isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}</button>
         </div>

@@ -10,30 +10,38 @@ export default function Dashboard() {
   const [groupName, setGroupName] = useState('')
   const [creating, setCreating] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
+  const [avatarUrl, setAvatarUrl] = useState(null)
+  const [displayName, setDisplayName] = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) window.location.href = '/auth'
-      else { setUser(user); loadGroups(user.id); setLoading(false) }
+      else { setUser(user); loadGroups(user.id); loadProfile(user.id); setLoading(false) }
     })
   }, [])
 
   async function loadGroups(userId) {
-    const { data, error } = await supabase.from('groups').select('*').eq('created_by', userId)
-    console.log('groups:', data, error)
+    const { data } = await supabase.from('groups').select('*').eq('created_by', userId)
     if (data) setGroups(data)
+  }
+
+  async function loadProfile(userId) {
+    const { data } = await supabase.from('profiles').select('display_name, avatar_url').eq('user_id', userId).single()
+    if (data) {
+      setDisplayName(data.display_name || '')
+      setAvatarUrl(data.avatar_url || null)
+    }
   }
 
   async function createGroup() {
     if (!groupName.trim()) return
     setCreating(true)
     const invite_code = Math.random().toString(36).substring(2, 8).toUpperCase()
-    const { data, error } = await supabase.from('groups').insert({
+    const { data } = await supabase.from('groups').insert({
       name: groupName.trim(),
       invite_code,
       created_by: user.id,
     }).select()
-    console.log('created:', data, error)
     if (data) {
       setGroups([...groups, data[0]])
       setGroupName('')
@@ -60,12 +68,26 @@ export default function Dashboard() {
         padding:'16px 32px',display:'flex',alignItems:'center',justifyContent:'space-between',
         borderBottom:'0.5px solid rgba(255,255,255,0.08)',
       }}>
-        <div style={{fontSize:'18px',fontWeight:700,color:'#FFD166',letterSpacing:'0.05em'}}>CASTAWAY</div>
-        <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
-          <span style={{fontSize:'13px',color:'rgba(255,255,255,0.4)'}}>{user.email}</span>
+        <div style={{fontSize:'18px',fontWeight:700,color:'#FFD166',letterSpacing:'0.05em',cursor:'pointer'}}
+          onClick={()=>window.location.href='/dashboard'}>CASTAWAY</div>
+        <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+          <button onClick={()=>window.location.href='/profile'} style={{
+            display:'flex',alignItems:'center',gap:'8px',
+            background:'rgba(255,255,255,0.05)',border:'0.5px solid rgba(255,255,255,0.1)',
+            borderRadius:'8px',padding:'5px 12px 5px 5px',cursor:'pointer',
+          }}>
+            <div style={{
+              width:'26px',height:'26px',borderRadius:'50%',
+              background: avatarUrl ? `url(${avatarUrl}) center/cover` : 'rgba(255,255,255,0.12)',
+              border:'1.5px solid rgba(255,255,255,0.15)',flexShrink:0,
+            }}/>
+            <span style={{fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>
+              {displayName || user.email}
+            </span>
+          </button>
           <button onClick={()=>supabase.auth.signOut().then(()=>window.location.href='/auth')}
             style={{background:'rgba(255,255,255,0.07)',border:'0.5px solid rgba(255,255,255,0.12)',
-            borderRadius:'8px',padding:'6px 14px',color:'rgba(255,255,255,0.6)',fontSize:'13px',cursor:'pointer'}}>
+            borderRadius:'8px',padding:'6px 14px',color:'rgba(255,255,255,0.4)',fontSize:'13px',cursor:'pointer'}}>
             Sign out
           </button>
         </div>

@@ -24,6 +24,19 @@ export default function JoinGroup() {
       window.location.href = '/auth'
       return
     }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!profile || !profile.display_name) {
+      localStorage.setItem('joinAfterAuth', code)
+      window.location.href = '/onboarding'
+      return
+    }
+
     setUser(user)
     await loadGroup(user)
   }
@@ -48,20 +61,14 @@ export default function JoinGroup() {
       .eq('group_id', groupData.id)
       .eq('user_id', currentUser.id)
 
-    if (memberData && memberData.length > 0) {
-      setAlreadyMember(true)
-    }
-
-    if (groupData.created_by === currentUser.id) {
-      setAlreadyMember(true)
-    }
+    if (memberData && memberData.length > 0) setAlreadyMember(true)
+    if (groupData.created_by === currentUser.id) setAlreadyMember(true)
 
     setLoading(false)
   }
 
   async function joinGroup() {
     setJoining(true)
-
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')

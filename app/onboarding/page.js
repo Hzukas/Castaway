@@ -1,35 +1,32 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { getSafeUser, safeRedirect } from '../../lib/authGuard'
 
 const NAME_IDEAS = ['Captain Sandy Toes', 'The Beach Whisperer', 'Passport Ninja', 'Sir Snacks-a-Lot', 'Vacation Mode: ON', 'Chief Adventure Officer']
 
 export default function Onboarding() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [stuck, setStuck] = useState(false)
+  const [authFailed, setAuthFailed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [placeholder, setPlaceholder] = useState(NAME_IDEAS[0])
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const stuckTimer = setTimeout(() => setStuck(true), 6000)
     init()
     setPlaceholder(NAME_IDEAS[Math.floor(Math.random() * NAME_IDEAS.length)])
-    return () => clearTimeout(stuckTimer)
   }, [])
 
   async function init() {
-    try {
-      const { data, error: authErr } = await supabase.auth.getUser()
-      if (authErr || !data?.user) { window.location.href = '/auth'; return }
-      setUser(data.user)
-      setLoading(false)
-    } catch (e) {
-      console.error('onboarding init failed', e)
-      window.location.href = '/auth'
+    const safeUser = await getSafeUser()
+    if (!safeUser) {
+      if (!safeRedirect('/auth')) setAuthFailed(true)
+      return
     }
+    setUser(safeUser)
+    setLoading(false)
   }
 
   function goNext() {
@@ -41,30 +38,27 @@ export default function Onboarding() {
   async function handleContinue() {
     if (!name.trim()) { setError('Give yourself a name — even a silly one works!'); return }
     setSaving(true)
-    const { error: dbError } = await supabase.from('profiles').upsert({
-      user_id: user.id, display_name: name.trim(),
-    }, { onConflict: 'user_id' })
+    const { error: dbError } = await supabase.from('profiles').upsert({ user_id: user.id, display_name: name.trim() }, { onConflict: 'user_id' })
     setSaving(false)
     if (dbError) { setError('Something went wrong, try again.'); return }
     goNext()
   }
 
-  function forceReauth() {
+  function manualSignIn() {
+    try { sessionStorage.removeItem('cw_redirects') } catch (e) {}
     supabase.auth.signOut().finally(() => { window.location.href = '/auth' })
   }
 
   if (loading) return (
     <main style={{minHeight:'100vh',background:'#0d1f2d',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'sans-serif'}}>
       <div style={{textAlign:'center'}}>
-        <div style={{color:'rgba(255,255,255,0.4)',marginBottom: stuck ? '16px' : 0}}>Loading...</div>
-        {stuck && (
+        {authFailed ? (
           <div>
-            <div style={{color:'rgba(255,255,255,0.3)',fontSize:'13px',marginBottom:'12px'}}>This is taking longer than expected.</div>
-            <button onClick={forceReauth} style={{
-              background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',
-              padding:'10px 20px',fontSize:'13px',fontWeight:700,cursor:'pointer',
-            }}>Sign in again</button>
+            <div style={{color:'rgba(255,255,255,0.5)',fontSize:'15px',marginBottom:'14px'}}>Sign in to continue.</div>
+            <button onClick={manualSignIn} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'10px 22px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>Sign in</button>
           </div>
+        ) : (
+          <div style={{color:'rgba(255,255,255,0.4)'}}>Loading...</div>
         )}
       </div>
     </main>
@@ -87,26 +81,13 @@ export default function Onboarding() {
           <p style={{color:'rgba(255,255,255,0.45)',fontSize:'14px',margin:0,lineHeight:1.5}}>This is your vacation alter-ego. Make it fun — it's what your group will see on every pitch and vote.</p>
         </div>
 
-        <input
-          value={name}
-          onChange={e=>{setName(e.target.value); setError('')}}
-          onKeyDown={e=>e.key==='Enter' && handleContinue()}
-          placeholder={placeholder}
-          autoFocus
-          style={{
-            width:'100%', padding:'14px 16px', borderRadius:'10px',
-            border: error ? '0.5px solid rgba(216,90,48,0.5)' : '0.5px solid rgba(255,255,255,0.15)',
-            background:'rgba(255,255,255,0.07)', color:'#fff', fontSize:'16px', outline:'none',
-            boxSizing:'border-box', textAlign:'center', fontWeight:500, marginBottom: error ? '8px' : '20px',
-          }}
+        <input value={name} onChange={e=>{setName(e.target.value); setError('')}} onKeyDown={e=>e.key==='Enter' && handleContinue()} placeholder={placeholder} autoFocus
+          style={{width:'100%', padding:'14px 16px', borderRadius:'10px', border: error ? '0.5px solid rgba(216,90,48,0.5)' : '0.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:'#fff', fontSize:'16px', outline:'none', boxSizing:'border-box', textAlign:'center', fontWeight:500, marginBottom: error ? '8px' : '20px'}}
         />
 
         {error && <div style={{color:'#F0997B', fontSize:'12px', textAlign:'center', marginBottom:'16px'}}>{error}</div>}
 
-        <button onClick={handleContinue} disabled={saving} style={{
-          width:'100%', padding:'14px', borderRadius:'10px', background:'#FFD166', color:'#1a0e00',
-          border:'none', fontSize:'15px', fontWeight:700, cursor:'pointer',
-        }}>{saving ? 'Saving...' : "Let's go →"}</button>
+        <button onClick={handleContinue} disabled={saving} style={{width:'100%', padding:'14px', borderRadius:'10px', background:'#FFD166', color:'#1a0e00', border:'none', fontSize:'15px', fontWeight:700, cursor:'pointer'}}>{saving ? 'Saving...' : "Let's go →"}</button>
 
         <div style={{textAlign:'center', marginTop:'16px'}}>
           <span style={{fontSize:'12px', color:'rgba(255,255,255,0.25)'}}>You can fill out the rest of your profile — budget, flight limits, vibe — anytime later.</span>

@@ -29,29 +29,38 @@ export default function AdminPage() {
   async function unlock() {
     setChecking(true)
     setPasswordError('')
-    const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': password } })
-    if (res.status === 401) {
-      setPasswordError('Wrong password.')
+    try {
+      const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': password } })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 401) { setPasswordError('Wrong password.'); return }
+      if (!res.ok || !Array.isArray(data.users)) {
+        setPasswordError('Server error: ' + (data.error || ('HTTP ' + res.status)) + ' — check SUPABASE_SERVICE_ROLE_KEY (must be legacy eyJ… key) and ADMIN_PASSWORD in Vercel, then redeploy.')
+        return
+      }
+      setUsers(data.users)
+      await loadGroups()
+      setUnlocked(true)
+    } catch (e) {
+      setPasswordError('Request failed: ' + e.message)
+    } finally {
       setChecking(false)
-      return
     }
-    const data = await res.json()
-    setUsers(data.users)
-    await loadGroups()
-    setUnlocked(true)
-    setChecking(false)
   }
 
   async function loadGroups() {
-    const res = await fetch('/api/admin/groups', { headers: { 'x-admin-password': password } })
-    const data = await res.json()
-    setGroups(data.groups || [])
+    try {
+      const res = await fetch('/api/admin/groups', { headers: { 'x-admin-password': password } })
+      const data = await res.json().catch(() => ({}))
+      setGroups(Array.isArray(data.groups) ? data.groups : [])
+    } catch (e) { setGroups([]) }
   }
 
   async function refreshUsers() {
-    const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': password } })
-    const data = await res.json()
-    setUsers(data.users)
+    try {
+      const res = await fetch('/api/admin/users', { headers: { 'x-admin-password': password } })
+      const data = await res.json().catch(() => ({}))
+      setUsers(Array.isArray(data.users) ? data.users : [])
+    } catch (e) {}
   }
 
   async function deleteUser(userId, email) {
@@ -91,19 +100,19 @@ export default function AdminPage() {
     else alert('Failed to save.')
   }
 
-  const filteredUsers = users.filter(u =>
+  const filteredUsers = (users || []).filter(u =>
     (u.email || '').toLowerCase().includes(userSearch.toLowerCase()) ||
     (u.display_name || '').toLowerCase().includes(userSearch.toLowerCase())
   )
-  const filteredGroups = groups.filter(g =>
+  const filteredGroups = (groups || []).filter(g =>
     (g.name || '').toLowerCase().includes(groupSearch.toLowerCase()) ||
     (g.invite_code || '').toLowerCase().includes(groupSearch.toLowerCase())
   )
 
   const stats = {
-    totalUsers: users.length,
-    totalGroups: groups.length,
-    newUsersWeek: users.filter(u => (Date.now() - new Date(u.created_at)) < 7*24*60*60*1000).length,
+    totalUsers: (users || []).length,
+    totalGroups: (groups || []).length,
+    newUsersWeek: (users || []).filter(u => (Date.now() - new Date(u.created_at)) < 7*24*60*60*1000).length,
     avgGroupSize: groups.length ? (groups.reduce((s,g)=>s+g.member_count,0) / groups.length).toFixed(1) : 0,
   }
 

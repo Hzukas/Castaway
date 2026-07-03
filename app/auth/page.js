@@ -6,6 +6,7 @@ import { getSafeUser, safeRedirect } from '../../lib/authGuard'
 export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [isLogin, setIsLogin] = useState(true)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,7 +15,6 @@ export default function Auth() {
     (async () => {
       const user = await getSafeUser()
       if (user) routeAfterAuth(user)
-      // if no user: just show the form (session was wiped if corrupted)
     })()
   }, [])
 
@@ -69,12 +69,24 @@ export default function Auth() {
           />
         </div>
 
-        <div style={{marginBottom:'24px'}}>
-          <input type="password" placeholder="Password" value={password}
+        <div style={{marginBottom:'24px', position:'relative'}}>
+          <input type={showPassword ? 'text' : 'password'} placeholder="Password" value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key==='Enter' && handleSubmit()}
-            style={{width:'100%', padding:'12px 14px', borderRadius:'10px', border:'0.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:'#fff', fontSize:'14px', outline:'none', boxSizing:'border-box'}}
+            style={{width:'100%', padding:'12px 44px 12px 14px', borderRadius:'10px', border:'0.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:'#fff', fontSize:'14px', outline:'none', boxSizing:'border-box'}}
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            style={{
+              position:'absolute', right:'10px', top:'50%', transform:'translateY(-50%)',
+              background:'none', border:'none', cursor:'pointer', padding:'4px',
+              color:'rgba(255,255,255,0.4)', fontSize:'16px', lineHeight:1,
+            }}
+          >
+            {showPassword ? '🙈' : '👁️'}
+          </button>
         </div>
 
         {message && (

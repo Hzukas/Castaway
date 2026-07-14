@@ -1,12 +1,29 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getSafeUser, safeRedirect } from '../../lib/authGuard'
 import { VIBE_OPTIONS, CLIMATE_OPTIONS } from '../../lib/tripOptions'
+import { useSearchParams } from 'next/navigation'
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export default function DestinationsPage() {
+  return (
+    <Suspense fallback={
+      <main style={{ minHeight: '100vh', background: '#0d1f2d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'sans-serif' }}>Loading...</div>
+      </main>
+    }>
+      <DestinationsPageInner />
+    </Suspense>
+  )
+}
+
+function DestinationsPageInner() {
+  const searchParams = useSearchParams()
+  const pitchFor = searchParams.get('pitchFor')
+  const groupName = searchParams.get('groupName')
+
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authFailed, setAuthFailed] = useState(false)
@@ -96,6 +113,12 @@ export default function DestinationsPage() {
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '15px', margin: 0 }}>{destinations.length} destinations to browse — search, filter, and dig into the honest details on each.</p>
         </div>
 
+        {pitchFor && (
+          <div style={{ background: 'rgba(255,209,102,0.08)', border: '0.5px solid rgba(255,209,102,0.25)', borderRadius: '12px', padding: '14px 20px', marginBottom: '20px' }}>
+            <div style={{ fontSize: '13px', color: '#FFD166', fontWeight: 600 }}>Picking a destination to pitch{groupName ? ` for ${groupName}` : ''}</div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
           <input
             value={search} onChange={e => setSearch(e.target.value)}
@@ -183,12 +206,12 @@ export default function DestinationsPage() {
         )}
       </div>
 
-      {expanded && <DestinationDetail destination={expanded} onClose={() => setExpanded(null)} />}
+      {expanded && <DestinationDetail destination={expanded} onClose={() => setExpanded(null)} pitchFor={pitchFor} />}
     </main>
   )
 }
 
-function DestinationDetail({ destination: d, onClose }) {
+function DestinationDetail({ destination: d, onClose, pitchFor }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '24px' }} onClick={onClose}>
       <div style={{ background: '#0d1f2d', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: '16px', width: '100%', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -244,7 +267,7 @@ function DestinationDetail({ destination: d, onClose }) {
           )}
 
           {(d.honest_intel || []).length > 0 && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '16px 18px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '16px 18px', marginBottom: pitchFor ? '16px' : 0 }}>
               <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>Weather & conditions — the honest version</div>
               <ul style={{ margin: 0, paddingLeft: '18px' }}>
                 {d.honest_intel.map((bullet, i) => (
@@ -252,6 +275,13 @@ function DestinationDetail({ destination: d, onClose }) {
                 ))}
               </ul>
             </div>
+          )}
+
+          {pitchFor && (
+            <button onClick={() => window.location.href = `/group/${pitchFor}/pitch/new?destination=${d.id}`} style={{
+              width: '100%', padding: '13px', borderRadius: '10px', background: '#FFD166', color: '#1a0e00',
+              border: 'none', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
+            }}>Pitch this destination →</button>
           )}
         </div>
       </div>

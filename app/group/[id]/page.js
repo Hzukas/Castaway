@@ -3,12 +3,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useParams } from 'next/navigation'
 import { VIBE_OPTIONS } from '../../../lib/tripOptions'
+import { matchPercent } from '../../../lib/matchScore'
 
 export default function GroupPage() {
   const { id } = useParams()
   const [user, setUser] = useState(null)
   const [group, setGroup] = useState(null)
   const [members, setMembers] = useState([])
+  const [pitches, setPitches] = useState([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [editingTarget, setEditingTarget] = useState(false)
@@ -31,13 +33,21 @@ export default function GroupPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) window.location.href = '/auth'
-      else { setUser(user); loadGroup(); loadMembers(); loadMyEgos(user.id) }
+      else { setUser(user); loadGroup(); loadMembers(); loadMyEgos(user.id); loadPitches() }
     })
   }, [])
 
   async function loadMyEgos(userId) {
     const { data } = await supabase.from('personalities').select('*').eq('user_id', userId).order('created_at', { ascending: true })
     if (data) setMyEgos(data)
+  }
+
+  async function loadPitches() {
+    const { data: pitchRows } = await supabase.from('pitches').select('*').eq('group_id', id).order('created_at', { ascending: false })
+    if (!pitchRows || pitchRows.length === 0) { setPitches([]); return }
+    const destIds = pitchRows.map(p => p.destination_id)
+    const { data: dests } = await supabase.from('destinations').select('*').in('id', destIds)
+    setPitches(pitchRows.map(p => ({ ...p, destination: dests?.find(d => d.id === p.destination_id) || null })))
   }
 
   async function loadGroup() {
@@ -462,9 +472,34 @@ export default function GroupPage() {
               borderRadius:'12px',padding:'20px 24px',
             }}>
               <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'14px'}}>
-                Vacation pitches · 0
+                Vacation pitches · {pitches.length}
               </div>
-              <button style={{
+
+              {pitches.length > 0 && (
+                <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'12px'}}>
+                  {pitches.map(p => {
+                    const pct = p.destination ? matchPercent(p.destination, group) : null
+                    return (
+                      <div key={p.id} onClick={()=>window.location.href=`/group/${id}/pitch/${p.id}`} style={{
+                        display:'flex',alignItems:'center',gap:'12px',padding:'10px 12px',borderRadius:'10px',
+                        background:'rgba(255,255,255,0.03)',cursor:'pointer',
+                      }}>
+                        <div style={{
+                          width:'44px',height:'44px',borderRadius:'8px',flexShrink:0,
+                          background: p.destination?.primary_photo_url ? `url(${p.destination.primary_photo_url}) center/cover` : 'rgba(255,255,255,0.1)',
+                        }} />
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:'14px',fontWeight:600,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.trip_name}</div>
+                          <div style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>{p.destination ? `${p.destination.name}, ${p.destination.country}` : ''}</div>
+                        </div>
+                        <div style={{fontSize:'13px',fontWeight:700,color: pct != null ? '#5DCAA5' : 'rgba(255,255,255,0.3)',flexShrink:0}}>{pct != null ? `${pct}%` : '—'}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <button onClick={()=>window.location.href=`/destinations?pitchFor=${id}&groupName=${encodeURIComponent(group.name)}`} style={{
                 width:'100%',padding:'16px',borderRadius:'10px',
                 border:'1px dashed rgba(255,255,255,0.12)',
                 background:'none',color:'rgba(255,255,255,0.4)',
@@ -487,7 +522,9 @@ export default function GroupPage() {
               <div style={{fontSize:'15px',fontWeight:600,color:'#fff'}}>Vacation ranking</div>
             </div>
             <div style={{fontSize:'13px',color:'rgba(255,255,255,0.3)',textAlign:'center',padding:'24px 0'}}>
-              No pitches yet — rankings appear here once your vacation starts pitching destinations.
+              {pitches.length === 0
+                ? 'No pitches yet — rankings appear here once your vacation starts pitching destinations.'
+                : 'Voting and ranking are coming in the next phase.'}
             </div>
           </div>
         </div>

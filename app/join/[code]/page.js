@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { getSafeUser, safeRedirect } from '../../../lib/authGuard'
 import { useParams } from 'next/navigation'
+import EgoPicker from '../../../components/EgoPicker'
 
 export default function JoinGroup() {
   const { code } = useParams()
@@ -14,6 +15,9 @@ export default function JoinGroup() {
   const [joined, setJoined] = useState(false)
   const [alreadyMember, setAlreadyMember] = useState(false)
   const [error, setError] = useState('')
+  const [egos, setEgos] = useState([])
+  const [accountAvatarUrl, setAccountAvatarUrl] = useState(null)
+  const [showEgoPicker, setShowEgoPicker] = useState(false)
 
   useEffect(() => { checkAuth() }, [])
 
@@ -25,12 +29,16 @@ export default function JoinGroup() {
       return
     }
 
-    const { data: profile } = await supabase.from('profiles').select('display_name').eq('user_id', safeUser.id).single()
-    if (!profile || !profile.display_name) {
+    const { data: personalities } = await supabase.from('personalities').select('*').eq('user_id', safeUser.id).order('created_at', { ascending: true })
+    if (!personalities || personalities.length === 0) {
       localStorage.setItem('joinAfterAuth', code)
       if (!safeRedirect('/onboarding')) setAuthFailed(true)
       return
     }
+    setEgos(personalities)
+
+    const { data: profile } = await supabase.from('profiles').select('avatar_url').eq('user_id', safeUser.id).single()
+    setAccountAvatarUrl(profile?.avatar_url || null)
 
     setUser(safeUser)
     await loadGroup(safeUser)
@@ -47,12 +55,25 @@ export default function JoinGroup() {
   }
 
   async function joinGroup() {
+    const { data: existingMemberships } = await supabase.from('group_members').select('id').eq('user_id', user.id)
+    const isFirstGroup = !existingMemberships || existingMemberships.length === 0
+    if (isFirstGroup) {
+      await finalizeJoin(egos[0]?.id || null)
+    } else {
+      setShowEgoPicker(true)
+    }
+  }
+
+  async function finalizeJoin(personalityId) {
     setJoining(true)
-    const { data: profile } = await supabase.from('profiles').select('*').eq('user_id', user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('home_airport').eq('user_id', user.id).single()
+    const ego = egos.find(e => e.id === personalityId)
     await supabase.from('group_members').insert({
       group_id: group.id, user_id: user.id, email: user.email,
-      home_airport: profile?.home_airport || null, max_flight_hours: profile?.max_flight_hours || null,
+      home_airport: profile?.home_airport || null, max_flight_hours: ego?.max_flight_hours || null,
+      personality_id: personalityId,
     })
+    setShowEgoPicker(false)
     setJoined(true)
     setJoining(false)
     setTimeout(() => { window.location.href = `/group/${group.id}` }, 1500)
@@ -114,6 +135,16 @@ export default function JoinGroup() {
           <div style={{marginTop:'16px',fontSize:'12px',color:'rgba(255,255,255,0.25)'}}>Signed in as {user?.email}</div>
         )}
       </div>
+
+      {showEgoPicker && (
+        <EgoPicker
+          userId={user.id}
+          personalities={egos}
+          accountAvatarUrl={accountAvatarUrl}
+          onConfirm={(personalityId)=>finalizeJoin(personalityId)}
+          onCancel={()=>setShowEgoPicker(false)}
+        />
+      )}
     </main>
   )
 }

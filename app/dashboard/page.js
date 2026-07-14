@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getSafeUser, safeRedirect } from '../../lib/authGuard'
+import EgoPicker from '../../components/EgoPicker'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
@@ -15,7 +16,10 @@ export default function Dashboard() {
   const [copiedId, setCopiedId] = useState(null)
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [displayName, setDisplayName] = useState('')
+  const [homeAirport, setHomeAirport] = useState(null)
   const [profileIncomplete, setProfileIncomplete] = useState(false)
+  const [egos, setEgos] = useState([])
+  const [showEgoPicker, setShowEgoPicker] = useState(false)
 
   useEffect(() => { init() }, [])
 
@@ -26,8 +30,13 @@ export default function Dashboard() {
       return
     }
     setUser(safeUser)
-    await Promise.all([loadGroups(safeUser.id), loadProfile(safeUser.id)])
+    await Promise.all([loadGroups(safeUser.id), loadProfile(safeUser.id), loadEgos(safeUser.id)])
     setLoading(false)
+  }
+
+  async function loadEgos(userId) {
+    const { data } = await supabase.from('personalities').select('*').eq('user_id', userId).order('created_at', { ascending: true })
+    if (data) setEgos(data)
   }
 
   async function loadGroups(userId) {
@@ -46,16 +55,35 @@ export default function Dashboard() {
     if (data) {
       setDisplayName(data.display_name || '')
       setAvatarUrl(data.avatar_url || null)
+      setHomeAirport(data.home_airport || null)
       if (!data.home_airport) setProfileIncomplete(true)
     } else setProfileIncomplete(true)
   }
 
   async function createGroup() {
     if (!groupName.trim()) return
+    const { data: existingMemberships } = await supabase.from('group_members').select('id').eq('user_id', user.id)
+    const isFirstGroup = !existingMemberships || existingMemberships.length === 0
+    if (isFirstGroup) {
+      await finalizeCreateGroup(egos[0]?.id || null)
+    } else {
+      setShowEgoPicker(true)
+    }
+  }
+
+  async function finalizeCreateGroup(personalityId) {
     setCreating(true)
     const invite_code = Math.random().toString(36).substring(2, 8).toUpperCase()
     const { data } = await supabase.from('groups').insert({ name: groupName.trim(), invite_code, created_by: user.id }).select()
-    if (data) { setMyGroups([...myGroups, data[0]]); setGroupName(''); setShowCreate(false) }
+    if (data) {
+      const ego = egos.find(e => e.id === personalityId)
+      await supabase.from('group_members').insert({
+        group_id: data[0].id, user_id: user.id, email: user.email,
+        home_airport: homeAirport || null, max_flight_hours: ego?.max_flight_hours || null,
+        personality_id: personalityId,
+      })
+      setMyGroups([...myGroups, data[0]]); setGroupName(''); setShowCreate(false); setShowEgoPicker(false)
+    }
     setCreating(false)
   }
 
@@ -176,6 +204,16 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {showEgoPicker && (
+        <EgoPicker
+          userId={user.id}
+          personalities={egos}
+          accountAvatarUrl={avatarUrl}
+          onConfirm={(personalityId)=>finalizeCreateGroup(personalityId)}
+          onCancel={()=>setShowEgoPicker(false)}
+        />
+      )}
     </main>
   )
 }

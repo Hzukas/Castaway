@@ -1,94 +1,101 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import { getSafeUser, safeRedirect } from '../../lib/authGuard'
+import EgoForm from '../../components/EgoForm'
 
-const VIBE_OPTIONS = [
-  'beach','wildlife','mountains','city','jungle','snow','snorkeling','hiking',
-  'nightlife','food','history','kid-friendly','off-grid','luxury',
-  'adventure','wellness / spa','surfing','cultural','camping',
-  'wine & breweries','ruins & temples','island','desert','eco-tourism'
-]
-
-const CLIMATE_OPTIONS = [
-  { value: 'tropical', label: '🌴 Tropical', sub: 'Hot & humid, lush' },
-  { value: 'dry_heat', label: '🏜️ Dry heat', sub: 'Desert, arid' },
-  { value: 'mediterranean', label: '🌞 Mediterranean', sub: 'Warm days, cool nights' },
-  { value: 'temperate', label: '🍃 Temperate', sub: 'Mild, moderate' },
-  { value: 'cool', label: '🍂 Cool & crisp', sub: 'Mountain / autumn feel' },
-  { value: 'cold', label: '❄️ Cold & snowy', sub: 'Winter wonderland' },
-]
-
-const PACE_OPTIONS = [
-  { value: 'relaxed', label: '😌 Relaxed', sub: 'Slow days, lots of downtime' },
-  { value: 'moderate', label: '🚶 Moderate', sub: 'Mix of activity and rest' },
-  { value: 'packed', label: '⚡ Packed', sub: 'See everything, go hard' },
-]
+const BLANK_EGO = {
+  display_name: '',
+  avatar_url: null,
+  max_flight_hours: '',
+  budget_min: '',
+  budget_max: '',
+  budget_flexible: true,
+  vibe_tags: [],
+  climate_prefs: [],
+  travel_pace: 'moderate',
+}
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [avatarUrl, setAvatarUrl] = useState(null)
+  const [authFailed, setAuthFailed] = useState(false)
+
+  // account
+  const [account, setAccount] = useState({ home_airport: '', passport_holder: true })
+  const [accountAvatarUrl, setAccountAvatarUrl] = useState(null)
+  const [savingAccount, setSavingAccount] = useState(false)
+  const [savedAccount, setSavedAccount] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
-  const [profile, setProfile] = useState({
-    display_name: '',
-    home_airport: '',
-    passport_holder: true,
-    max_flight_hours: '',
-    budget_min: '',
-    budget_max: '',
-    budget_flexible: true,
-    vibe_tags: [],
-    climate_prefs: [],
-    travel_pace: 'moderate',
-  })
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) window.location.href = '/auth'
-      else { setUser(user); loadProfile(user.id) }
-    })
-  }, [])
+  // egos
+  const [egos, setEgos] = useState([])
+  const [openEgoId, setOpenEgoId] = useState(null) // an ego id, 'new', or null
+  const [egoForm, setEgoForm] = useState(BLANK_EGO)
+  const [savingEgo, setSavingEgo] = useState(false)
+  const [egoUploading, setEgoUploading] = useState(false)
+  const egoFileInputRef = useRef(null)
 
-  async function loadProfile(userId) {
-    const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).single()
-    if (data) {
-      setProfile({
-        display_name: data.display_name || '',
-        home_airport: data.home_airport || '',
-        passport_holder: data.passport_holder ?? true,
-        max_flight_hours: data.max_flight_hours || '',
-        budget_min: data.budget_min || '',
-        budget_max: data.budget_max || '',
-        budget_flexible: data.budget_flexible ?? true,
-        vibe_tags: data.vibe_tags || [],
-        climate_prefs: data.climate_prefs || [],
-        travel_pace: data.travel_pace || 'moderate',
-      })
-      if (data.avatar_url) setAvatarUrl(data.avatar_url)
+  useEffect(() => { init() }, [])
+
+  async function init() {
+    const safeUser = await getSafeUser()
+    if (!safeUser) {
+      if (!safeRedirect('/auth')) setAuthFailed(true)
+      return
     }
+    setUser(safeUser)
+    await Promise.all([loadAccount(safeUser.id), loadEgos(safeUser.id)])
     setLoading(false)
   }
 
-  async function uploadAvatar(event) {
+  async function loadAccount(userId) {
+    const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).single()
+    if (data) {
+      setAccount({
+        home_airport: data.home_airport || '',
+        passport_holder: data.passport_holder ?? true,
+      })
+      if (data.avatar_url) setAccountAvatarUrl(data.avatar_url)
+    }
+  }
+
+  async function loadEgos(userId) {
+    const { data } = await supabase.from('personalities').select('*').eq('user_id', userId).order('created_at', { ascending: true })
+    if (data) setEgos(data)
+  }
+
+  async function uploadAccountAvatar(event) {
     const file = event.target.files?.[0]
     if (!file) return
-    setUploading(true)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${user.id}.${fileExt}`
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, file, { upsert: true })
-    if (!uploadError) {
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName)
-      setAvatarUrl(publicUrl + '?t=' + Date.now())
+    await doAvatarUpload(file, `${user.id}`, async (publicUrl) => {
+      setAccountAvatarUrl(publicUrl + '?t=' + Date.now())
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('user_id', user.id)
+    }, setUploading)
+  }
+
+  async function uploadEgoAvatar(event) {
+    const file = event.target.files?.[0]
+    if (!file || !openEgoId || openEgoId === 'new') return
+    await doAvatarUpload(file, `${user.id}-ego-${openEgoId}`, async (publicUrl) => {
+      const stamped = publicUrl + '?t=' + Date.now()
+      setEgoForm(f => ({ ...f, avatar_url: stamped }))
+      await supabase.from('personalities').update({ avatar_url: publicUrl }).eq('id', openEgoId)
+      setEgos(list => list.map(e => e.id === openEgoId ? { ...e, avatar_url: stamped } : e))
+    }, setEgoUploading)
+  }
+
+  async function doAvatarUpload(file, baseName, onDone, setBusy) {
+    setBusy(true)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${baseName}.${fileExt}`
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true })
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName)
+      await onDone(publicUrl)
     }
-    setUploading(false)
+    setBusy(false)
   }
 
   async function handlePaste(event) {
@@ -97,17 +104,26 @@ export default function ProfilePage() {
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile()
-        if (file) {
+        if (!file) continue
+        if (openEgoId && openEgoId !== 'new') {
+          setEgoUploading(true)
+          const fileName = `${user.id}-ego-${openEgoId}.png`
+          const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true, contentType: 'image/png' })
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName)
+            const stamped = publicUrl + '?t=' + Date.now()
+            setEgoForm(f => ({ ...f, avatar_url: stamped }))
+            await supabase.from('personalities').update({ avatar_url: publicUrl }).eq('id', openEgoId)
+            setEgos(list => list.map(e => e.id === openEgoId ? { ...e, avatar_url: stamped } : e))
+          }
+          setEgoUploading(false)
+        } else {
           setUploading(true)
           const fileName = `${user.id}.png`
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, file, { upsert: true, contentType: 'image/png' })
+          const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true, contentType: 'image/png' })
           if (!uploadError) {
-            const { data: { publicUrl } } = supabase.storage
-              .from('avatars')
-              .getPublicUrl(fileName)
-            setAvatarUrl(publicUrl + '?t=' + Date.now())
+            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName)
+            setAccountAvatarUrl(publicUrl + '?t=' + Date.now())
             await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('user_id', user.id)
           }
           setUploading(false)
@@ -116,42 +132,89 @@ export default function ProfilePage() {
     }
   }
 
-  async function saveProfile() {
-    setSaving(true)
+  async function saveAccount() {
+    setSavingAccount(true)
     const { error } = await supabase.from('profiles').upsert({
       user_id: user.id,
-      display_name: profile.display_name || null,
-      home_airport: profile.home_airport || null,
-      passport_holder: profile.passport_holder,
-      max_flight_hours: profile.max_flight_hours || null,
-      budget_min: profile.budget_min || null,
-      budget_max: profile.budget_max || null,
-      budget_flexible: profile.budget_flexible,
-      vibe_tags: profile.vibe_tags,
-      climate_prefs: profile.climate_prefs,
-      travel_pace: profile.travel_pace,
-      avatar_url: avatarUrl || null,
+      home_airport: account.home_airport || null,
+      passport_holder: account.passport_holder,
+      avatar_url: accountAvatarUrl ? accountAvatarUrl.split('?')[0] : null,
     }, { onConflict: 'user_id' })
-    setSaving(false)
-    if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+    setSavingAccount(false)
+    if (!error) { setSavedAccount(true); setTimeout(() => setSavedAccount(false), 2000) }
   }
 
-  function toggleVibe(tag) {
-    setProfile(p => ({
-      ...p,
-      vibe_tags: p.vibe_tags.includes(tag)
-        ? p.vibe_tags.filter(v => v !== tag)
-        : [...p.vibe_tags, tag]
-    }))
+  function openEgo(ego) {
+    setOpenEgoId(ego.id)
+    setEgoForm({
+      display_name: ego.display_name || '',
+      avatar_url: ego.avatar_url || null,
+      max_flight_hours: ego.max_flight_hours || '',
+      budget_min: ego.budget_min || '',
+      budget_max: ego.budget_max || '',
+      budget_flexible: ego.budget_flexible ?? true,
+      vibe_tags: ego.vibe_tags || [],
+      climate_prefs: ego.climate_prefs || [],
+      travel_pace: ego.travel_pace || 'moderate',
+    })
   }
 
-  function toggleClimate(val) {
-    setProfile(p => ({
-      ...p,
-      climate_prefs: p.climate_prefs.includes(val)
-        ? p.climate_prefs.filter(v => v !== val)
-        : [...p.climate_prefs, val]
-    }))
+  function openNewEgo() {
+    setOpenEgoId('new')
+    setEgoForm(BLANK_EGO)
+  }
+
+  function closeEgo() {
+    setOpenEgoId(null)
+    setEgoForm(BLANK_EGO)
+  }
+
+  async function saveEgo() {
+    if (!egoForm.display_name.trim()) return
+    setSavingEgo(true)
+    const payload = {
+      display_name: egoForm.display_name.trim(),
+      max_flight_hours: egoForm.max_flight_hours || null,
+      budget_min: egoForm.budget_min || null,
+      budget_max: egoForm.budget_max || null,
+      budget_flexible: egoForm.budget_flexible,
+      vibe_tags: egoForm.vibe_tags,
+      climate_prefs: egoForm.climate_prefs,
+      travel_pace: egoForm.travel_pace,
+    }
+    if (openEgoId === 'new') {
+      await supabase.from('personalities').insert({ user_id: user.id, ...payload })
+    } else {
+      await supabase.from('personalities').update(payload).eq('id', openEgoId)
+    }
+    setSavingEgo(false)
+    await loadEgos(user.id)
+    closeEgo()
+  }
+
+  async function deleteEgo(ego) {
+    const { data: inUse } = await supabase.from('group_members').select('id').eq('personality_id', ego.id).limit(1)
+    if (inUse && inUse.length > 0) {
+      alert(`"${ego.display_name}" is currently representing you in a group. Switch that group to a different ego first (from the group page), then you can delete this one.`)
+      return
+    }
+    if (!confirm(`Delete the ego "${ego.display_name}"? This can't be undone.`)) return
+    await supabase.from('personalities').delete().eq('id', ego.id)
+    if (openEgoId === ego.id) closeEgo()
+    await loadEgos(user.id)
+  }
+
+  function toggleEgoVibe(tag) {
+    setEgoForm(f => ({ ...f, vibe_tags: f.vibe_tags.includes(tag) ? f.vibe_tags.filter(v => v !== tag) : [...f.vibe_tags, tag] }))
+  }
+
+  function toggleEgoClimate(val) {
+    setEgoForm(f => ({ ...f, climate_prefs: f.climate_prefs.includes(val) ? f.climate_prefs.filter(v => v !== val) : [...f.climate_prefs, val] }))
+  }
+
+  function manualSignIn() {
+    try { sessionStorage.removeItem('cw_redirects') } catch (e) {}
+    supabase.auth.signOut().finally(() => { window.location.href = '/auth' })
   }
 
   const inputStyle = {
@@ -161,9 +224,25 @@ export default function ProfilePage() {
     fontSize:'14px',outline:'none',boxSizing:'border-box',
   }
 
+  const cardStyle = {
+    background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',
+    borderRadius:'12px',padding:'20px 24px',marginBottom:'16px',
+  }
+
+  const labelStyle = { fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'16px' }
+
   if (loading) return (
-    <main style={{minHeight:'100vh',background:'#0d1f2d',display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <div style={{color:'rgba(255,255,255,0.4)',fontFamily:'sans-serif'}}>Loading...</div>
+    <main style={{minHeight:'100vh',background:'#0d1f2d',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'sans-serif'}}>
+      <div style={{textAlign:'center'}}>
+        {authFailed ? (
+          <div>
+            <div style={{color:'rgba(255,255,255,0.5)',fontSize:'15px',marginBottom:'14px'}}>Your session needs a refresh.</div>
+            <button onClick={manualSignIn} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'10px 22px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>Sign in</button>
+          </div>
+        ) : (
+          <div style={{color:'rgba(255,255,255,0.4)'}}>Loading...</div>
+        )}
+      </div>
     </main>
   )
 
@@ -184,21 +263,21 @@ export default function ProfilePage() {
 
       <div style={{maxWidth:'640px',margin:'0 auto',padding:'48px 24px'}}>
         <div style={{marginBottom:'32px'}}>
-          <h1 style={{fontSize:'28px',fontWeight:700,color:'#fff',margin:'0 0 8px'}}>Your travel profile</h1>
+          <h1 style={{fontSize:'28px',fontWeight:700,color:'#fff',margin:'0 0 8px'}}>Your account</h1>
           <p style={{color:'rgba(255,255,255,0.4)',fontSize:'15px',margin:0}}>
-            This info carries into every group you join — no need to re-enter it each time.
+            Facts that stay true no matter which trip you're planning.
           </p>
         </div>
 
-        {/* AVATAR */}
-        <div style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'20px 24px',marginBottom:'16px'}}>
-          <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'16px'}}>Profile picture</div>
+        {/* ACCOUNT AVATAR */}
+        <div style={cardStyle}>
+          <div style={labelStyle}>Profile picture</div>
           <div style={{display:'flex',alignItems:'center',gap:'20px'}}>
             <div
               onClick={()=>fileInputRef.current?.click()}
               style={{
                 width:'80px',height:'80px',borderRadius:'50%',
-                background: avatarUrl ? `url(${avatarUrl}) center/cover` : 'rgba(255,255,255,0.08)',
+                background: accountAvatarUrl ? `url(${accountAvatarUrl}) center/cover` : 'rgba(255,255,255,0.08)',
                 border:'2px solid rgba(255,255,255,0.12)',
                 display:'flex',alignItems:'center',justifyContent:'center',
                 cursor:'pointer',transition:'border-color 0.15s',flexShrink:0,
@@ -207,7 +286,7 @@ export default function ProfilePage() {
               onMouseOver={e=>e.currentTarget.style.borderColor='rgba(255,209,102,0.5)'}
               onMouseOut={e=>e.currentTarget.style.borderColor='rgba(255,255,255,0.12)'}
             >
-              {!avatarUrl && !uploading && <span style={{fontSize:'28px',color:'rgba(255,255,255,0.25)'}}>+</span>}
+              {!accountAvatarUrl && !uploading && <span style={{fontSize:'28px',color:'rgba(255,255,255,0.25)'}}>+</span>}
               {uploading && <span style={{fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>...</span>}
             </div>
             <div>
@@ -216,39 +295,34 @@ export default function ProfilePage() {
                 borderRadius:'8px',padding:'8px 16px',color:'rgba(255,255,255,0.6)',
                 fontSize:'13px',cursor:'pointer',marginBottom:'6px',display:'block',
               }}>
-                {avatarUrl ? 'Change photo' : 'Upload photo'}
+                {accountAvatarUrl ? 'Change photo' : 'Upload photo'}
               </button>
               <div style={{fontSize:'11px',color:'rgba(255,255,255,0.25)'}}>
-                Click to upload or press Ctrl+V to paste from clipboard
+                This is your default photo — each alter ego can use its own instead. Click to upload or press Ctrl+V to paste.
               </div>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadAvatar} style={{display:'none'}} />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={uploadAccountAvatar} style={{display:'none'}} />
           </div>
         </div>
 
         {/* BASICS */}
-        <div style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'20px 24px',marginBottom:'16px'}}>
-          <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'16px'}}>Basics</div>
+        <div style={cardStyle}>
+          <div style={labelStyle}>Basics</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px'}}>
-            <div style={{gridColumn:'1/-1'}}>
-              <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'6px'}}>Display name</div>
-              <input value={profile.display_name} onChange={e=>setProfile(p=>({...p,display_name:e.target.value}))}
-                placeholder="e.g. Harrison" style={inputStyle} />
-            </div>
             <div>
               <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'6px'}}>Home airport</div>
-              <input value={profile.home_airport} onChange={e=>setProfile(p=>({...p,home_airport:e.target.value.toUpperCase()}))}
+              <input value={account.home_airport} onChange={e=>setAccount(a=>({...a,home_airport:e.target.value.toUpperCase()}))}
                 placeholder="DEN" maxLength={3} style={inputStyle} />
             </div>
             <div>
               <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'6px'}}>Passport holder?</div>
               <div style={{display:'flex',gap:'8px'}}>
                 {['Yes','No'].map(opt=>(
-                  <button key={opt} onClick={()=>setProfile(p=>({...p,passport_holder:opt==='Yes'}))} style={{
+                  <button key={opt} onClick={()=>setAccount(a=>({...a,passport_holder:opt==='Yes'}))} style={{
                     flex:1,padding:'10px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',fontWeight:500,
-                    background:(opt==='Yes'&&profile.passport_holder)||(opt==='No'&&!profile.passport_holder)?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.05)',
-                    border:(opt==='Yes'&&profile.passport_holder)||(opt==='No'&&!profile.passport_holder)?'0.5px solid rgba(255,209,102,0.4)':'0.5px solid rgba(255,255,255,0.1)',
-                    color:(opt==='Yes'&&profile.passport_holder)||(opt==='No'&&!profile.passport_holder)?'#FFD166':'rgba(255,255,255,0.4)',
+                    background:(opt==='Yes'&&account.passport_holder)||(opt==='No'&&!account.passport_holder)?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.05)',
+                    border:(opt==='Yes'&&account.passport_holder)||(opt==='No'&&!account.passport_holder)?'0.5px solid rgba(255,209,102,0.4)':'0.5px solid rgba(255,255,255,0.1)',
+                    color:(opt==='Yes'&&account.passport_holder)||(opt==='No'&&!account.passport_holder)?'#FFD166':'rgba(255,255,255,0.4)',
                   }}>{opt}</button>
                 ))}
               </div>
@@ -256,127 +330,90 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* FLIGHT PREFERENCES */}
-        <div style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'20px 24px',marginBottom:'16px'}}>
-          <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'16px'}}>Flight preferences</div>
-          <div>
-            <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'6px'}}>Max flight hours</div>
-            <input type="number" value={profile.max_flight_hours}
-              onChange={e=>setProfile(p=>({...p,max_flight_hours:e.target.value}))}
-              placeholder="Leave blank for no limit" style={inputStyle} />
-            <div style={{fontSize:'11px',color:'rgba(255,255,255,0.25)',marginTop:'6px'}}>
-              This becomes a hard limit in any group you join. Leave blank if you're flexible.
-            </div>
-          </div>
-        </div>
-
-        {/* BUDGET */}
-        <div style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'20px 24px',marginBottom:'16px'}}>
-          <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'16px'}}>Budget comfort</div>
-          <div style={{marginBottom:'14px'}}>
-            <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'8px'}}>How do you approach trip budgets?</div>
-            <div style={{display:'flex',gap:'8px'}}>
-              <button onClick={()=>setProfile(p=>({...p,budget_flexible:true}))} style={{
-                flex:1,padding:'10px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',
-                background:profile.budget_flexible?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.05)',
-                border:profile.budget_flexible?'0.5px solid rgba(255,209,102,0.4)':'0.5px solid rgba(255,255,255,0.1)',
-                color:profile.budget_flexible?'#FFD166':'rgba(255,255,255,0.4)',
-              }}>
-                <div style={{fontWeight:500}}>Flexible</div>
-                <div style={{fontSize:'11px',opacity:0.7,marginTop:'2px'}}>No hard limit</div>
-              </button>
-              <button onClick={()=>setProfile(p=>({...p,budget_flexible:false}))} style={{
-                flex:1,padding:'10px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',
-                background:!profile.budget_flexible?'rgba(255,209,102,0.15)':'rgba(255,255,255,0.05)',
-                border:!profile.budget_flexible?'0.5px solid rgba(255,209,102,0.4)':'0.5px solid rgba(255,255,255,0.1)',
-                color:!profile.budget_flexible?'#FFD166':'rgba(255,255,255,0.4)',
-              }}>
-                <div style={{fontWeight:500}}>Set a range</div>
-                <div style={{fontSize:'11px',opacity:0.7,marginTop:'2px'}}>Min and max per trip</div>
-              </button>
-            </div>
-          </div>
-          {!profile.budget_flexible && (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
-              <div>
-                <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'6px'}}>Min budget ($)</div>
-                <input type="number" value={profile.budget_min}
-                  onChange={e=>setProfile(p=>({...p,budget_min:e.target.value}))}
-                  placeholder="e.g. 1000" style={inputStyle} />
-              </div>
-              <div>
-                <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'6px'}}>Max budget ($)</div>
-                <input type="number" value={profile.budget_max}
-                  onChange={e=>setProfile(p=>({...p,budget_max:e.target.value}))}
-                  placeholder="e.g. 3000" style={inputStyle} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* CLIMATE PREFERENCES */}
-        <div style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'20px 24px',marginBottom:'16px'}}>
-          <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'6px'}}>Preferred climate</div>
-          <div style={{fontSize:'11px',color:'rgba(255,255,255,0.25)',marginBottom:'14px'}}>Select all that appeal to you</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}>
-            {CLIMATE_OPTIONS.map(opt=>(
-              <button key={opt.value} onClick={()=>toggleClimate(opt.value)} style={{
-                padding:'10px 14px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',textAlign:'left',
-                background: profile.climate_prefs.includes(opt.value) ? 'rgba(55,138,221,0.15)' : 'rgba(255,255,255,0.04)',
-                border: profile.climate_prefs.includes(opt.value) ? '0.5px solid rgba(55,138,221,0.4)' : '0.5px solid rgba(255,255,255,0.08)',
-                color: profile.climate_prefs.includes(opt.value) ? '#7ec8f5' : 'rgba(255,255,255,0.5)',
-              }}>
-                <div style={{fontWeight:500}}>{opt.label}</div>
-                <div style={{fontSize:'11px',opacity:0.6,marginTop:'2px'}}>{opt.sub}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* TRAVEL STYLE */}
-        <div style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'20px 24px',marginBottom:'16px'}}>
-          <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'16px'}}>Travel style</div>
-          <div style={{marginBottom:'16px'}}>
-            <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'8px'}}>Travel pace</div>
-            <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-              {PACE_OPTIONS.map(opt=>(
-                <button key={opt.value} onClick={()=>setProfile(p=>({...p,travel_pace:opt.value}))} style={{
-                  padding:'10px 14px',borderRadius:'8px',fontSize:'13px',cursor:'pointer',textAlign:'left',
-                  background:profile.travel_pace===opt.value?'rgba(255,209,102,0.12)':'rgba(255,255,255,0.04)',
-                  border:profile.travel_pace===opt.value?'0.5px solid rgba(255,209,102,0.4)':'0.5px solid rgba(255,255,255,0.08)',
-                  color:profile.travel_pace===opt.value?'#FFD166':'rgba(255,255,255,0.5)',
-                  display:'flex',justifyContent:'space-between',alignItems:'center',
-                }}>
-                  <span style={{fontWeight:500}}>{opt.label}</span>
-                  <span style={{fontSize:'11px',opacity:0.7}}>{opt.sub}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)',marginBottom:'8px'}}>Vibe preferences</div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-              {VIBE_OPTIONS.map(tag=>(
-                <button key={tag} onClick={()=>toggleVibe(tag)} style={{
-                  padding:'5px 12px',borderRadius:'20px',fontSize:'12px',cursor:'pointer',
-                  background:profile.vibe_tags.includes(tag)?'rgba(29,158,117,0.2)':'rgba(255,255,255,0.05)',
-                  border:profile.vibe_tags.includes(tag)?'0.5px solid rgba(29,158,117,0.4)':'0.5px solid rgba(255,255,255,0.1)',
-                  color:profile.vibe_tags.includes(tag)?'#5DCAA5':'rgba(255,255,255,0.4)',
-                }}>{tag}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <button onClick={saveProfile} disabled={saving} style={{
+        <button onClick={saveAccount} disabled={savingAccount} style={{
           width:'100%',padding:'14px',borderRadius:'10px',
-          background: saved ? 'rgba(29,158,117,0.2)' : '#FFD166',
-          border: saved ? '0.5px solid rgba(29,158,117,0.4)' : 'none',
-          color: saved ? '#5DCAA5' : '#1a0e00',
-          fontSize:'15px',fontWeight:700,cursor:'pointer',
+          background: savedAccount ? 'rgba(29,158,117,0.2)' : '#FFD166',
+          border: savedAccount ? '0.5px solid rgba(29,158,117,0.4)' : 'none',
+          color: savedAccount ? '#5DCAA5' : '#1a0e00',
+          fontSize:'15px',fontWeight:700,cursor:'pointer',marginBottom:'48px',
         }}>
-          {saving ? 'Saving...' : saved ? '✓ Saved!' : 'Save profile'}
+          {savingAccount ? 'Saving...' : savedAccount ? '✓ Saved!' : 'Save account'}
         </button>
+
+        {/* ALTER EGOS */}
+        <div style={{marginBottom:'20px'}}>
+          <h2 style={{fontSize:'22px',fontWeight:700,color:'#fff',margin:'0 0 8px'}}>Your alter egos</h2>
+          <p style={{color:'rgba(255,255,255,0.4)',fontSize:'14px',margin:0}}>
+            Different personas for different trips — budget, vibe, and pace can vary per ego. Your first group uses one automatically; you'll get to pick or create one when you join or start a second group.
+          </p>
+        </div>
+
+        <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'16px'}}>
+          {egos.map(ego => (
+            <div key={ego.id} style={{background:'rgba(255,255,255,0.04)',border: openEgoId===ego.id ? '0.5px solid rgba(255,209,102,0.4)' : '0.5px solid rgba(255,255,255,0.08)',borderRadius:'12px',overflow:'hidden'}}>
+              <div style={{padding:'16px 20px',display:'flex',alignItems:'center',gap:'14px',cursor:'pointer'}} onClick={()=> openEgoId===ego.id ? closeEgo() : openEgo(ego)}>
+                <div style={{
+                  width:'44px',height:'44px',borderRadius:'50%',flexShrink:0,
+                  background: (ego.avatar_url || accountAvatarUrl) ? `url(${ego.avatar_url || accountAvatarUrl}) center/cover` : 'rgba(255,255,255,0.1)',
+                  border:'1.5px solid rgba(255,255,255,0.15)',
+                }} />
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'15px',fontWeight:600,color:'#fff'}}>{ego.display_name}</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginTop:'4px'}}>
+                    {(ego.vibe_tags||[]).slice(0,4).map(tag=>(
+                      <span key={tag} style={{fontSize:'11px',color:'#5DCAA5',background:'rgba(29,158,117,0.12)',border:'0.5px solid rgba(29,158,117,0.3)',borderRadius:'20px',padding:'2px 8px'}}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <span style={{color:'rgba(255,255,255,0.3)',fontSize:'13px'}}>{openEgoId===ego.id ? 'Close' : 'Edit'}</span>
+              </div>
+
+              {openEgoId === ego.id && (
+                <div style={{padding:'0 20px 20px'}}>
+                  <EgoForm
+                    egoForm={egoForm} setEgoForm={setEgoForm}
+                    toggleVibe={toggleEgoVibe} toggleClimate={toggleEgoClimate}
+                    inputStyle={inputStyle}
+                    avatarUrl={egoForm.avatar_url || accountAvatarUrl}
+                    onAvatarClick={()=>egoFileInputRef.current?.click()}
+                    uploading={egoUploading}
+                    canCustomizePhoto
+                  />
+                  <div style={{display:'flex',gap:'8px',marginTop:'16px'}}>
+                    <button onClick={()=>deleteEgo(ego)} style={{background:'rgba(216,90,48,0.1)',border:'0.5px solid rgba(216,90,48,0.3)',borderRadius:'8px',padding:'10px 18px',color:'#F0997B',fontSize:'13px',cursor:'pointer'}}>Delete</button>
+                    <div style={{flex:1}} />
+                    <button onClick={closeEgo} style={{background:'rgba(255,255,255,0.06)',border:'0.5px solid rgba(255,255,255,0.12)',borderRadius:'8px',padding:'10px 18px',color:'rgba(255,255,255,0.5)',fontSize:'13px',cursor:'pointer'}}>Cancel</button>
+                    <button onClick={saveEgo} disabled={savingEgo} style={{background:'#FFD166',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#1a0e00',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>{savingEgo ? 'Saving...' : 'Save ego'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {openEgoId === 'new' ? (
+          <div style={{background:'rgba(255,255,255,0.04)',border:'0.5px solid rgba(255,209,102,0.4)',borderRadius:'12px',padding:'20px',marginBottom:'40px'}}>
+            <div style={{fontSize:'14px',fontWeight:600,color:'#fff',marginBottom:'14px'}}>New alter ego</div>
+            <EgoForm
+              egoForm={egoForm} setEgoForm={setEgoForm}
+              toggleVibe={toggleEgoVibe} toggleClimate={toggleEgoClimate}
+              inputStyle={inputStyle}
+              avatarUrl={accountAvatarUrl}
+              canCustomizePhoto={false}
+            />
+            <div style={{display:'flex',gap:'8px',marginTop:'16px'}}>
+              <div style={{flex:1}} />
+              <button onClick={closeEgo} style={{background:'rgba(255,255,255,0.06)',border:'0.5px solid rgba(255,255,255,0.12)',borderRadius:'8px',padding:'10px 18px',color:'rgba(255,255,255,0.5)',fontSize:'13px',cursor:'pointer'}}>Cancel</button>
+              <button onClick={saveEgo} disabled={savingEgo} style={{background:'#FFD166',border:'none',borderRadius:'8px',padding:'10px 20px',color:'#1a0e00',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>{savingEgo ? 'Saving...' : 'Create ego'}</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={openNewEgo} style={{width:'100%',padding:'16px',borderRadius:'12px',border:'1px dashed rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.03)',color:'rgba(255,255,255,0.5)',fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',marginBottom:'40px'}}>
+            <span style={{fontSize:'18px'}}>+</span>Create new ego
+          </button>
+        )}
+
+        <input ref={egoFileInputRef} type="file" accept="image/*" onChange={uploadEgoAvatar} style={{display:'none'}} />
       </div>
     </main>
   )

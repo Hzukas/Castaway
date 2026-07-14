@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useParams } from 'next/navigation'
-
-const VIBE_OPTIONS = ['beach','wildlife','mountains','city','jungle','snow','snorkeling','hiking','nightlife','food','history','kid-friendly','off-grid','luxury']
+import { VIBE_OPTIONS } from '../../../lib/tripOptions'
 
 export default function GroupPage() {
   const { id } = useParams()
@@ -14,6 +13,7 @@ export default function GroupPage() {
   const [copied, setCopied] = useState(false)
   const [editingTarget, setEditingTarget] = useState(false)
   const [editingFlight, setEditingFlight] = useState(false)
+  const [myEgos, setMyEgos] = useState([])
 
   const [target, setTarget] = useState({
     target_budget: '',
@@ -31,9 +31,14 @@ export default function GroupPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) window.location.href = '/auth'
-      else { setUser(user); loadGroup(); loadMembers() }
+      else { setUser(user); loadGroup(); loadMembers(); loadMyEgos(user.id) }
     })
   }, [])
+
+  async function loadMyEgos(userId) {
+    const { data } = await supabase.from('personalities').select('*').eq('user_id', userId).order('created_at', { ascending: true })
+    if (data) setMyEgos(data)
+  }
 
   async function loadGroup() {
     const { data } = await supabase.from('groups').select('*').eq('id', id).single()
@@ -51,8 +56,29 @@ export default function GroupPage() {
   }
 
   async function loadMembers() {
-    const { data } = await supabase.from('group_members').select('*').eq('group_id', id)
-    if (data) setMembers(data)
+    const { data: gm } = await supabase.from('group_members').select('*').eq('group_id', id)
+    if (!gm) return
+    const personalityIds = gm.map(m => m.personality_id).filter(Boolean)
+    const userIds = gm.map(m => m.user_id)
+    const [{ data: personalities }, { data: profiles }] = await Promise.all([
+      personalityIds.length ? supabase.from('personalities').select('*').in('id', personalityIds) : Promise.resolve({ data: [] }),
+      userIds.length ? supabase.from('profiles').select('user_id, avatar_url').in('user_id', userIds) : Promise.resolve({ data: [] }),
+    ])
+    setMembers(gm.map(m => ({
+      ...m,
+      personality: personalities?.find(p => p.id === m.personality_id) || null,
+      accountAvatar: profiles?.find(p => p.user_id === m.user_id)?.avatar_url || null,
+    })))
+  }
+
+  async function switchEgo(personalityId) {
+    if (!myMember) return
+    const ego = myEgos.find(e => e.id === personalityId)
+    await supabase.from('group_members').update({
+      personality_id: personalityId,
+      max_flight_hours: ego?.max_flight_hours || null,
+    }).eq('id', myMember.id)
+    loadMembers()
   }
 
   async function saveTarget() {
@@ -373,19 +399,49 @@ export default function GroupPage() {
                 </div>
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
-                  {members.map(m=>(
+                  {members.map(m=>{
+                    const avatar = m.personality?.avatar_url || m.accountAvatar
+                    const name = m.personality?.display_name || m.email
+                    const isMe = m.user_id === user?.id
+                    return (
                     <div key={m.id} style={{
                       display:'flex',alignItems:'center',justifyContent:'space-between',
-                      padding:'8px 12px',borderRadius:'8px',background:'rgba(255,255,255,0.03)',
+                      padding:'8px 12px',borderRadius:'8px',background:'rgba(255,255,255,0.03)',gap:'10px',
                     }}>
-                      <div style={{fontSize:'13px',color:'rgba(255,255,255,0.6)'}}>
-                        {m.email} {m.home_airport && <span style={{color:'#FFD166',fontSize:'12px'}}>({m.home_airport})</span>}
+                      <div style={{display:'flex',alignItems:'center',gap:'10px',minWidth:0}}>
+                        <div style={{
+                          width:'28px',height:'28px',borderRadius:'50%',flexShrink:0,
+                          background: avatar ? `url(${avatar}) center/cover` : 'rgba(255,255,255,0.1)',
+                          border:'1px solid rgba(255,255,255,0.15)',
+                        }} />
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:'13px',color:'rgba(255,255,255,0.75)',fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            {name} {m.home_airport && <span style={{color:'#FFD166',fontSize:'12px'}}>({m.home_airport})</span>}
+                          </div>
+                          {(m.personality?.vibe_tags||[]).length > 0 && (
+                            <div style={{display:'flex',flexWrap:'wrap',gap:'4px',marginTop:'3px'}}>
+                              {m.personality.vibe_tags.slice(0,3).map(tag=>(
+                                <span key={tag} style={{fontSize:'10px',color:'#5DCAA5',background:'rgba(29,158,117,0.12)',border:'0.5px solid rgba(29,158,117,0.3)',borderRadius:'20px',padding:'1px 7px'}}>{tag}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{fontSize:'13px',color:m.max_flight_hours?'#5DCAA5':'rgba(255,255,255,0.3)'}}>
-                        {m.max_flight_hours ? `Max ${m.max_flight_hours}h` : 'No limit'}
+                      <div style={{display:'flex',alignItems:'center',gap:'10px',flexShrink:0}}>
+                        {isMe && myEgos.length > 1 && (
+                          <select value={m.personality_id || ''} onChange={e=>switchEgo(e.target.value)} style={{
+                            background:'rgba(255,255,255,0.06)',border:'0.5px solid rgba(255,255,255,0.15)',
+                            borderRadius:'6px',padding:'4px 8px',color:'rgba(255,255,255,0.6)',fontSize:'11px',cursor:'pointer',
+                          }}>
+                            {myEgos.map(e=><option key={e.id} value={e.id}>{e.display_name}</option>)}
+                          </select>
+                        )}
+                        <div style={{fontSize:'13px',color:m.max_flight_hours?'#5DCAA5':'rgba(255,255,255,0.3)',whiteSpace:'nowrap'}}>
+                          {m.max_flight_hours ? `Max ${m.max_flight_hours}h` : 'No limit'}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  )})}
                   {effectiveMaxFlight && (
                     <div style={{
                       marginTop:'6px',padding:'8px 12px',borderRadius:'8px',

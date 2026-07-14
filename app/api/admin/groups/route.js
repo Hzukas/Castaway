@@ -14,19 +14,19 @@ export async function GET(req) {
 
   const { data: members } = await supabaseAdmin.from('group_members').select('group_id')
   const { data: authData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-  const { data: profiles } = await supabaseAdmin.from('profiles').select('user_id, display_name')
+  const { data: personalities } = await supabaseAdmin.from('personalities').select('user_id, display_name, created_at').order('created_at', { ascending: true })
 
   const counts = {}
   members?.forEach(m => { counts[m.group_id] = (counts[m.group_id] || 0) + 1 })
 
   const groupsWithInfo = groups.map(g => {
     const creator = authData?.users.find(u => u.id === g.created_by)
-    const creatorProfile = profiles?.find(p => p.user_id === g.created_by)
+    const creatorEgo = personalities?.find(p => p.user_id === g.created_by)
     return {
       ...g,
-      member_count: (counts[g.id] || 0) + 1,
+      member_count: counts[g.id] || 0,
       creator_email: creator?.email || 'unknown',
-      creator_name: creatorProfile?.display_name || null,
+      creator_name: creatorEgo?.display_name || null,
     }
   }).sort((a, b) => b.id.localeCompare(a.id))
 

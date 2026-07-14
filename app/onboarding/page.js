@@ -38,9 +38,11 @@ export default function Onboarding() {
   async function handleContinue() {
     if (!name.trim()) { setError('Give yourself a name — even a silly one works!'); return }
     setSaving(true)
-    const { error: dbError } = await supabase.from('profiles').upsert({ user_id: user.id, display_name: name.trim() }, { onConflict: 'user_id' })
+    const { error: dbError } = await supabase.from('profiles').upsert({ user_id: user.id }, { onConflict: 'user_id' })
+    if (dbError) { setSaving(false); setError('Something went wrong, try again.'); return }
+    const { error: egoError } = await supabase.from('personalities').insert({ user_id: user.id, display_name: name.trim() })
     setSaving(false)
-    if (dbError) { setError('Something went wrong, try again.'); return }
+    if (egoError) { setError('Something went wrong, try again.'); return }
     goNext()
   }
 

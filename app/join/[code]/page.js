@@ -46,7 +46,7 @@ export default function JoinGroup() {
 
   async function loadGroup(currentUser) {
     const { data: groupData } = await supabase.from('groups').select('*').eq('invite_code', code).single()
-    if (!groupData) { setError('Group not found. Check the invite link.'); setLoading(false); return }
+    if (!groupData) { setError('Vacation not found. Check the invite link.'); setLoading(false); return }
     setGroup(groupData)
     const { data: memberData } = await supabase.from('group_members').select('*').eq('group_id', groupData.id).eq('user_id', currentUser.id)
     if (memberData && memberData.length > 0) setAlreadyMember(true)
@@ -91,7 +91,7 @@ export default function JoinGroup() {
         {authFailed ? (
           <div>
             <div style={{fontSize:'40px',marginBottom:'12px'}}>🏝️</div>
-            <div style={{color:'rgba(255,255,255,0.5)',fontSize:'15px',marginBottom:'14px'}}>Sign in to join this group.</div>
+            <div style={{color:'rgba(255,255,255,0.5)',fontSize:'15px',marginBottom:'14px'}}>Sign in to join this vacation.</div>
             <button onClick={manualSignIn} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'10px 22px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>Sign in</button>
           </div>
         ) : (
@@ -120,15 +120,15 @@ export default function JoinGroup() {
           {alreadyMember ? "You're already in!" : joined ? 'Welcome aboard!' : `Join ${group.name}`}
         </h1>
         <p style={{color:'rgba(255,255,255,0.4)',fontSize:'14px',marginBottom:'24px'}}>
-          {alreadyMember ? `You're already a member of ${group.name}.` : joined ? 'Taking you to the group now...' : `You've been invited to plan a trip with ${group.name}.`}
+          {alreadyMember ? `You're already part of ${group.name}.` : joined ? 'Taking you to your vacation now...' : `You've been invited to plan a trip with ${group.name}.`}
         </p>
 
         {alreadyMember ? (
-          <button onClick={()=>window.location.href=`/group/${group.id}`} style={{width:'100%',padding:'13px',borderRadius:'10px',background:'#FFD166',color:'#1a0e00',border:'none',fontSize:'15px',fontWeight:700,cursor:'pointer'}}>Open group →</button>
+          <button onClick={()=>window.location.href=`/group/${group.id}`} style={{width:'100%',padding:'13px',borderRadius:'10px',background:'#FFD166',color:'#1a0e00',border:'none',fontSize:'15px',fontWeight:700,cursor:'pointer'}}>Open vacation →</button>
         ) : joined ? (
           <div style={{padding:'12px',borderRadius:'10px',background:'rgba(29,158,117,0.15)',border:'0.5px solid rgba(29,158,117,0.3)',color:'#5DCAA5',fontSize:'14px',fontWeight:600}}>✓ Joined!</div>
         ) : (
-          <button onClick={joinGroup} disabled={joining} style={{width:'100%',padding:'13px',borderRadius:'10px',background:'#FFD166',color:'#1a0e00',border:'none',fontSize:'15px',fontWeight:700,cursor:'pointer'}}>{joining ? 'Joining...' : 'Join this group'}</button>
+          <button onClick={joinGroup} disabled={joining} style={{width:'100%',padding:'13px',borderRadius:'10px',background:'#FFD166',color:'#1a0e00',border:'none',fontSize:'15px',fontWeight:700,cursor:'pointer'}}>{joining ? 'Joining...' : 'Join this vacation'}</button>
         )}
 
         {!alreadyMember && !joined && (

@@ -57,7 +57,7 @@ export default function Auth() {
           <div style={{fontSize:'13px', color:'#FFD166', fontWeight:600, letterSpacing:'0.1em', marginBottom:'8px'}}>CASTAWAY</div>
           <h1 style={{color:'#fff', fontSize:'24px', fontWeight:700, margin:0}}>{isLogin ? 'Welcome back' : 'Create account'}</h1>
           <p style={{color:'rgba(255,255,255,0.4)', fontSize:'14px', marginTop:'8px'}}>
-            {isLogin ? 'Sign in to your group' : 'Start planning together'}
+            {isLogin ? 'Sign in to your vacation' : 'Start planning together'}
           </p>
         </div>
 

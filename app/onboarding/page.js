@@ -80,7 +80,7 @@ export default function Onboarding() {
           <div style={{fontSize:'40px',marginBottom:'12px'}}>🏝️</div>
           <div style={{fontSize:'13px',color:'#FFD166',fontWeight:600,letterSpacing:'0.1em',marginBottom:'10px'}}>WELCOME TO CASTAWAY</div>
           <h1 style={{color:'#fff',fontSize:'24px',fontWeight:700,margin:'0 0 10px',lineHeight:1.3}}>First things first — what should we call you?</h1>
-          <p style={{color:'rgba(255,255,255,0.45)',fontSize:'14px',margin:0,lineHeight:1.5}}>This is your vacation alter-ego. Make it fun — it's what your group will see on every pitch and vote.</p>
+          <p style={{color:'rgba(255,255,255,0.45)',fontSize:'14px',margin:0,lineHeight:1.5}}>This is your vacation alter-ego. Make it fun — it's what your vacation crew will see on every pitch and vote.</p>
         </div>
 
         <input value={name} onChange={e=>{setName(e.target.value); setError('')}} onKeyDown={e=>e.key==='Enter' && handleContinue()} placeholder={placeholder} autoFocus

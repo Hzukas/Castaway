@@ -153,7 +153,7 @@ export default function GroupPage() {
 
   if (!group) return (
     <main style={{minHeight:'100vh',background:'#0d1f2d',display:'flex',alignItems:'center',justifyContent:'center'}}>
-      <div style={{color:'rgba(255,255,255,0.4)',fontFamily:'sans-serif'}}>Group not found.</div>
+      <div style={{color:'rgba(255,255,255,0.4)',fontFamily:'sans-serif'}}>Vacation not found.</div>
     </main>
   )
 
@@ -200,7 +200,7 @@ export default function GroupPage() {
             }}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px'}}>
                 <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase'}}>
-                  Group target
+                  Vacation target
                 </div>
                 <button onClick={()=>setEditingTarget(!editingTarget)} style={{
                   background:'none',border:'0.5px solid rgba(255,255,255,0.12)',
@@ -448,7 +448,7 @@ export default function GroupPage() {
                       background:'rgba(255,209,102,0.08)',border:'0.5px solid rgba(255,209,102,0.2)',
                       fontSize:'12px',color:'#FFD166',
                     }}>
-                      ✈️ Effective group max: {effectiveMaxFlight}h (most restrictive member)
+                      ✈️ Effective vacation max: {effectiveMaxFlight}h (most restrictive member)
                     </div>
                   )}
                 </div>
@@ -484,10 +484,10 @@ export default function GroupPage() {
           }}>
             <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}}>
               <span style={{fontSize:'16px'}}>🏆</span>
-              <div style={{fontSize:'15px',fontWeight:600,color:'#fff'}}>Group ranking</div>
+              <div style={{fontSize:'15px',fontWeight:600,color:'#fff'}}>Vacation ranking</div>
             </div>
             <div style={{fontSize:'13px',color:'rgba(255,255,255,0.3)',textAlign:'center',padding:'24px 0'}}>
-              No pitches yet — rankings appear here once your group starts pitching destinations.
+              No pitches yet — rankings appear here once your vacation starts pitching destinations.
             </div>
           </div>
         </div>

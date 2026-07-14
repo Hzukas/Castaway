@@ -141,7 +141,7 @@ export default function ProfilePage() {
       avatar_url: accountAvatarUrl ? accountAvatarUrl.split('?')[0] : null,
     }, { onConflict: 'user_id' })
     setSavingAccount(false)
-    if (!error) { setSavedAccount(true); setTimeout(() => setSavedAccount(false), 2000) }
+    if (!error) { setSavedAccount(true); setTimeout(() => { window.location.href = '/dashboard' }, 700) }
   }
 
   function openEgo(ego) {
@@ -195,7 +195,7 @@ export default function ProfilePage() {
   async function deleteEgo(ego) {
     const { data: inUse } = await supabase.from('group_members').select('id').eq('personality_id', ego.id).limit(1)
     if (inUse && inUse.length > 0) {
-      alert(`"${ego.display_name}" is currently representing you in a group. Switch that group to a different ego first (from the group page), then you can delete this one.`)
+      alert(`"${ego.display_name}" is currently representing you on a vacation. Switch that vacation to a different ego first (from the vacation page), then you can delete this one.`)
       return
     }
     if (!confirm(`Delete the ego "${ego.display_name}"? This can't be undone.`)) return
@@ -344,7 +344,7 @@ export default function ProfilePage() {
         <div style={{marginBottom:'20px'}}>
           <h2 style={{fontSize:'22px',fontWeight:700,color:'#fff',margin:'0 0 8px'}}>Your alter egos</h2>
           <p style={{color:'rgba(255,255,255,0.4)',fontSize:'14px',margin:0}}>
-            Different personas for different trips — budget, vibe, and pace can vary per ego. Your first group uses one automatically; you'll get to pick or create one when you join or start a second group.
+            Different personas for different trips — budget, vibe, and pace can vary per ego. Your first vacation uses one automatically; you'll get to pick or create one when you join or start a second vacation.
           </p>
         </div>
 

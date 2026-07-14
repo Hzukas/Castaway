@@ -48,7 +48,7 @@ export default function Home() {
             background:'#FFD166',color:'#1a0e00',border:'none',
             borderRadius:'10px',padding:'14px 32px',fontSize:'15px',
             fontWeight:700,cursor:'pointer',textDecoration:'none',
-          }}>Start a group</a>
+          }}>Start a vacation</a>
           <a href="#how" style={{
             background:'transparent',color:'rgba(255,255,255,0.7)',
             border:'1px solid rgba(255,255,255,0.2)',borderRadius:'10px',

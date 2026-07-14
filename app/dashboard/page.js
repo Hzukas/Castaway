@@ -134,7 +134,7 @@ export default function Dashboard() {
           <div style={{background:'rgba(255,209,102,0.08)',border:'0.5px solid rgba(255,209,102,0.25)',borderRadius:'12px',padding:'16px 20px',marginBottom:'24px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'16px'}}>
             <div>
               <div style={{fontSize:'14px',fontWeight:600,color:'#FFD166',marginBottom:'2px'}}>Finish setting up your profile</div>
-              <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Add your home airport so groups can calculate flight limits for you.</div>
+              <div style={{fontSize:'12px',color:'rgba(255,255,255,0.4)'}}>Add your home airport so your vacations can calculate flight limits for you.</div>
             </div>
             <button onClick={()=>window.location.href='/profile'} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'8px 18px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>Complete profile</button>
           </div>
@@ -142,15 +142,15 @@ export default function Dashboard() {
 
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'32px'}}>
           <div>
-            <h1 style={{fontSize:'28px',fontWeight:700,color:'#fff',margin:'0 0 8px'}}>Your groups</h1>
-            <p style={{color:'rgba(255,255,255,0.4)',fontSize:'15px',margin:0}}>Create a group and invite your people to plan together.</p>
+            <h1 style={{fontSize:'28px',fontWeight:700,color:'#fff',margin:'0 0 8px'}}>Your vacations</h1>
+            <p style={{color:'rgba(255,255,255,0.4)',fontSize:'15px',margin:0}}>Create a vacation and invite your people to plan together.</p>
           </div>
-          <button onClick={()=>setShowCreate(!showCreate)} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'10px',padding:'10px 20px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>+ New group</button>
+          <button onClick={()=>setShowCreate(!showCreate)} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'10px',padding:'10px 20px',fontSize:'14px',fontWeight:700,cursor:'pointer'}}>+ New vacation</button>
         </div>
 
         {showCreate && (
           <div style={{background:'rgba(255,255,255,0.05)',border:'0.5px solid rgba(255,255,255,0.12)',borderRadius:'12px',padding:'20px',marginBottom:'24px'}}>
-            <div style={{fontSize:'14px',fontWeight:600,color:'#fff',marginBottom:'12px'}}>Name your group</div>
+            <div style={{fontSize:'14px',fontWeight:600,color:'#fff',marginBottom:'12px'}}>Name your vacation</div>
             <div style={{display:'flex',gap:'10px'}}>
               <input value={groupName} onChange={e=>setGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="e.g. Johnson family trip"
                 style={{flex:1,padding:'10px 14px',borderRadius:'8px',border:'0.5px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:'14px',outline:'none'}}/>
@@ -161,13 +161,13 @@ export default function Dashboard() {
 
         {allGroups.length === 0 && !showCreate && (
           <button onClick={()=>setShowCreate(true)} style={{width:'100%',padding:'20px',borderRadius:'12px',border:'1px dashed rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.03)',color:'rgba(255,255,255,0.5)',fontSize:'15px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'}}>
-            <span style={{fontSize:'22px'}}>+</span>Create your first group
+            <span style={{fontSize:'22px'}}>+</span>Create your first vacation
           </button>
         )}
 
         {myGroups.length > 0 && (
           <>
-            <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'10px'}}>Groups you created</div>
+            <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'10px'}}>Vacations you created</div>
             <div style={{display:'flex',flexDirection:'column',gap:'12px',marginBottom:'24px'}}>
               {myGroups.map(group => (
                 <div key={group.id} style={{background:'rgba(255,255,255,0.05)',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -179,7 +179,7 @@ export default function Dashboard() {
                     <button onClick={()=>copyInviteLink(group.invite_code)} style={{background: copiedId===group.invite_code ? 'rgba(29,158,117,0.2)' : 'rgba(255,255,255,0.07)',border: copiedId===group.invite_code ? '0.5px solid rgba(29,158,117,0.4)' : '0.5px solid rgba(255,255,255,0.12)',borderRadius:'8px',padding:'8px 16px',color: copiedId===group.invite_code ? '#5DCAA5' : 'rgba(255,255,255,0.6)',fontSize:'13px',cursor:'pointer'}}>
                       {copiedId===group.invite_code ? '✓ Copied!' : 'Copy invite link'}
                     </button>
-                    <button onClick={()=>window.location.href=`/group/${group.id}`} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Open group →</button>
+                    <button onClick={()=>window.location.href=`/group/${group.id}`} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Open vacation →</button>
                   </div>
                 </div>
               ))}
@@ -189,7 +189,7 @@ export default function Dashboard() {
 
         {memberGroups.length > 0 && (
           <>
-            <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'10px'}}>Groups you've joined</div>
+            <div style={{fontSize:'11px',fontWeight:600,color:'rgba(255,255,255,0.3)',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:'10px'}}>Vacations you've joined</div>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               {memberGroups.map(group => (
                 <div key={group.id} style={{background:'rgba(255,255,255,0.05)',border:'0.5px solid rgba(255,255,255,0.1)',borderRadius:'12px',padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -197,7 +197,7 @@ export default function Dashboard() {
                     <div style={{fontSize:'17px',fontWeight:600,color:'#fff',marginBottom:'4px'}}>{group.name}</div>
                     <div style={{fontSize:'12px',color:'rgba(255,255,255,0.35)'}}>Code: {group.invite_code}</div>
                   </div>
-                  <button onClick={()=>window.location.href=`/group/${group.id}`} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Open group →</button>
+                  <button onClick={()=>window.location.href=`/group/${group.id}`} style={{background:'#FFD166',color:'#1a0e00',border:'none',borderRadius:'8px',padding:'8px 16px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Open vacation →</button>
                 </div>
               ))}
             </div>
